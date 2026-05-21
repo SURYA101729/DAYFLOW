@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌊</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DayFlow - Smart Day Scheduler</title>
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                dark: '#1E3A5F',
+                light: '#F0F4F8',
+                accent: '#3498DB'
+              },
+              success: '#2ECC71',
+              warning: '#F39C12',
+              danger: '#E74C3C'
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            boxShadow: {
+              'premium': '0 4px 20px -2px rgba(30, 58, 95, 0.08), 0 2px 12px -1px rgba(30, 58, 95, 0.04)',
+              'premium-hover': '0 10px 30px -3px rgba(30, 58, 95, 0.12), 0 4px 18px -2px rgba(30, 58, 95, 0.06)',
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #F0F4F8;
+        color: #1E3A5F;
+      }
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #CBD5E1;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen antialiased text-[#1E3A5F]">
+    <div id="app" class="flex flex-col lg:flex-row min-h-screen">
+      <!-- App container dynamically mounted here -->
+    </div>
+
+    <script>
+      // ==========================================
+      // DATABASE (Local Storage Fallback)
+      // ==========================================
+      const getStorage = (key, defaultVal) => {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : defaultVal;
+      };
+      const setStorage = (key, val) => {
+        localStorage.setItem(key, JSON.stringify(val));
+      };
+
+      // Initial Seed Data
+      if (!localStorage.getItem('dayflow_tasks')) {
+        setStorage('dayflow_tasks', [
+          { id: 1, title: 'Design system review 🎨', category: 'Work', startTime: '09:00', duration: 45, isCompleted: true, taskDate: new Date().toISOString().substring(0, 10) },
+          { id: 2, title: 'Code refactoring 💻', category: 'Study', startTime: '11:30', duration: 90, isCompleted: false, taskDate: new Date().toISOString().substring(0, 10) },
+          { id: 3, title: 'Evening stretch 🧘', category: 'Health', startTime: '18:00', duration: 15, isCompleted: false, taskDate: new Date().toISOString().substring(0, 10) }
+        ]);
+      }
+      if (!localStorage.getItem('dayflow_advice')) {
+        setStorage('dayflow_advice', []);
+      }
+      if (!localStorage.getItem('dayflow_support')) {
+        setStorage('dayflow_support', [
+          { id: 1, name: 'Surya M', email: 'surya@example.com', subject: 'API Rate limit increase', message: 'Hi team, could you please increase my daily limit from 10 to 20?', isResolved: false, createdAt: new Date().toISOString() }
+        ]);
+      }
+      if (!localStorage.getItem('dayflow_habits')) {
+        setStorage('dayflow_habits', { hydrate: false, stretch: false, meditate: false });
+      }
+
+      // App State
+      let state = {
+        user: getStorage('dayflow_user', null), // { name: 'Demo User', email: 'user@example.com', role: 'ADMIN' }
+        view: 'login', // login, register, home, advice, analysis, support, adminSupport
+        tasks: getStorage('dayflow_tasks', []),
+        advice: getStorage('dayflow_advice', []),
+        support: getStorage('dayflow_support', []),
+        habits: getStorage('dayflow_habits', { hydrate: false, stretch: false, meditate: false }),
+        editingTask: null,
+        isModalOpen: false,
+        adviceInput: { strengths: '', weaknesses: '' },
+        supportInput: { name: '', email: '', subject: '', message: '' },
+        currentAdviceResult: null,
+        supportSuccess: false,
+        analysisRange: 'week',
+        errorMessage: '',
+        successMessage: '',
+        isLoading: false
+      };
+
+      if (state.user) {
+        state.view = 'home';
+      }
+
+      const navigate = (view) => {
+        state.view = view;
+        state.errorMessage = '';
+        state.successMessage = '';
+        render();
+      };
+
+      // ==========================================
+      // ACTION HANDLERS
+      // ==========================================
+      const handleLogin = (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!email || !password) {
+          state.errorMessage = 'Please fill in all fields.';
+          render();
+          return;
+        }
+
+        // Simple auth mock
+        const isDefaultAdmin = email.toLowerCase() === 'admin@dayflow.com';
+        const userObj = {
+          name: isDefaultAdmin ? 'Admin User' : 'Surya M',
+          email: email,
+          role: isDefaultAdmin ? 'ADMIN' : 'USER'
+        };
+
+        state.user = userObj;
+        setStorage('dayflow_user', userObj);
+        navigate('home');
+      };
+
+      const handleRegister = (e) => {
+        e.preventDefault();
+        const name = document.getElementById('reg-name').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
+        const password = document.getElementById('reg-password').value;
+
+        if (!name || !email || !password) {
+          state.errorMessage = 'All fields are required.';
+          render();
+          return;
+        }
+
+        const userObj = { name, email, role: 'USER' };
+        state.user = userObj;
+        setStorage('dayflow_user', userObj);
+        navigate('home');
+      };
+
+      const handleLogout = () => {
+        state.user = null;
+        localStorage.removeItem('dayflow_user');
+        navigate('login');
+      };
+
+      const handleToggleComplete = (taskId) => {
+        state.tasks = state.tasks.map(t => {
+          if (t.id === taskId) {
+            const nextStatus = !t.isCompleted;
+            // Confetti trigger if 100% completion
+            setTimeout(() => {
+              checkConfettiTrigger();
+            }, 100);
+            return { ...t, isCompleted: nextStatus };
+          }
+          return t;
+        });
+        setStorage('dayflow_tasks', state.tasks);
+        render();
+      };
+
+      const checkConfettiTrigger = () => {
+        const today = new Date().toISOString().substring(0, 10);
+        const todayTasks = state.tasks.filter(t => t.taskDate === today);
+        if (todayTasks.length > 0 && todayTasks.every(t => t.isCompleted)) {
+          confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        }
+      };
+
+      const handleDeleteTask = (taskId) => {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        setStorage('dayflow_tasks', state.tasks);
+        render();
+      };
+
+      const handleSaveTask = (e) => {
+        e.preventDefault();
+        const title = document.getElementById('task-title').value.trim();
+        const category = document.getElementById('task-category').value;
+        const startTime = document.getElementById('task-time').value;
+        const duration = parseInt(document.getElementById('task-duration').value, 10);
+        const taskDate = document.getElementById('task-date').value;
+
+        if (!title || !startTime || isNaN(duration) || duration <= 0) {
+          alert('Please fill out all required fields correctly.');
+          return;
+        }
+
+        if (state.editingTask) {
+          state.tasks = state.tasks.map(t => t.id === state.editingTask.id 
+            ? { ...t, title, category, startTime, duration, taskDate } 
+            : t
+          );
+        } else {
+          const newTask = {
+            id: Date.now(),
+            title,
+            category,
+            startTime,
+            duration,
+            taskDate,
+            isCompleted: false
+          };
+          state.tasks.push(newTask);
+        }
+
+        setStorage('dayflow_tasks', state.tasks);
+        state.isModalOpen = false;
+        state.editingTask = null;
+        render();
+      };
+
+      const toggleHabit = (key) => {
+        state.habits[key] = !state.habits[key];
+        setStorage('dayflow_habits', state.habits);
+        render();
+      };
+
+      const handleGetAdvice = (e) => {
+        e.preventDefault();
+        const strengths = document.getElementById('adv-strengths').value.trim();
+        const weaknesses = document.getElementById('adv-weaknesses').value.trim();
+
+        if (strengths.length < 10 || weaknesses.length < 10) {
+          state.errorMessage = 'Both descriptions must be at least 10 characters long.';
+          render();
+          return;
+        }
+
+        state.isLoading = true;
+        render();
+
+        setTimeout(() => {
+          const mockResult = `## 🎯 Areas Needing Improvement
+- **Focus Allocation**: Your weaknesses in distraction require structured calendar blocking.
+- **Stress Management**: Procrastination is a response to overload; divide projects into 15-minute segments.
+
+## 🛡️ Handling Daily Life Crises
+- When feeling overwhelmed, execute a 5-minute breathing break.
+- Declutter your physical and digital workspaces immediately to restore clarity.
+
+## 💪 Overcoming Weaknesses
+- Turn off push notifications during core tasks.
+- Keep a written log of daily milestones to gamify your schedule.
+
+## 🚀 Leveraging Your Strengths
+- Harness your creative planning capabilities to draft visual flowcharts for complicated assignments.
+- Mentor others to reinforce your active listening skills.
+
+## 📋 Daily Action Plan
+1. Drink a glass of water first thing in the morning 💧.
+2. Outline exactly 3 core deliverables before checking emails.
+3. Block out two 45-minute focus intervals separated by a break.
+4. Conduct a 5-minute stretch review after lunch.
+5. Record your daily wins in the DayFlow logs.`;
+
+          const session = {
+            id: Date.now(),
+            strengths,
+            weaknesses,
+            aiResponse: mockResult,
+            createdAt: new Date().toISOString()
+          };
+
+          state.advice.unshift(session);
+          setStorage('dayflow_advice', state.advice);
+          state.currentAdviceResult = session;
+          state.isLoading = false;
+          state.errorMessage = '';
+          render();
+        }, 1500);
+      };
+
+      const handleSupportSubmit = (e) => {
+        e.preventDefault();
+        const name = document.getElementById('sup-name').value.trim();
+        const email = document.getElementById('sup-email').value.trim();
+        const subject = document.getElementById('sup-subject').value.trim();
+        const message = document.getElementById('sup-message').value.trim();
+
+        if (!name || !email || !subject || !message) {
+          state.errorMessage = 'All fields are required.';
+          render();
+          return;
+        }
+
+        const newMsg = {
+          id: Date.now(),
+          name,
+          email,
+          subject,
+          message,
+          isResolved: false,
+          createdAt: new Date().toISOString()
+        };
+
+        state.support.unshift(newMsg);
+        setStorage('dayflow_support', state.support);
+        state.supportSuccess = true;
+        render();
+      };
+
+      const toggleResolveMessage = (msgId) => {
+        state.support = state.support.map(m => m.id === msgId ? { ...m, isResolved: !m.isResolved } : m);
+        setStorage('dayflow_support', state.support);
+        render();
+      };
+
+      // ==========================================
+      // HTML UI VIEWS GENERATION
+      // ==========================================
+      const render = () => {
+        const rootDiv = document.getElementById('app');
+        
+        // Login View
+        if (state.view === 'login') {
+          rootDiv.className = "flex items-center justify-center min-h-screen w-full p-4 bg-[#F0F4F8]";
+          rootDiv.innerHTML = `
+            <div class="w-full max-w-md glass-panel p-8 rounded-3xl shadow-premium border border-white/60 relative z-10">
+              <div class="text-center mb-8">
+                <span class="text-5xl mb-3 block">🌊</span>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary-dark to-primary-accent bg-clip-text text-transparent">Welcome to DayFlow</h1>
+                <p class="text-sm text-slate-500 mt-2">Manage your scheduler & unlock AI advice</p>
+              </div>
+              
+              ${state.errorMessage ? `
+                <div class="mb-5 p-4 bg-red-50 border border-red-200 text-danger text-sm rounded-xl flex items-center gap-2">
+                  <span>⚠️</span> ${state.errorMessage}
+                </div>
+              ` : ''}
+
+              <form onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                  <input type="email" id="login-email" value="admin@dayflow.com" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm" required />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+                  <input type="password" id="login-password" value="password" placeholder="••••••••" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm" required />
+                </div>
+                <button type="submit" class="w-full py-3 bg-[#1E3A5F] hover:bg-slate-800 text-white font-semibold rounded-xl shadow-premium transition duration-200 text-sm mt-2">
+                  Sign In
+                </button>
+              </form>
+              <div class="text-center mt-6 pt-6 border-t border-slate-200/50">
+                <p class="text-sm text-slate-500">
+                  Don't have an account? 
+                  <button onclick="navigate('register')" class="text-primary-accent hover:underline font-semibold">Create account</button>
+                </p>
+                <p class="text-[11px] text-slate-400 mt-4">💡 Hint: Enter <b>admin@dayflow.com</b> to access admin features.</p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // Register View
+        if (state.view === 'register') {
+          rootDiv.className = "flex items-center justify-center min-h-screen w-full p-4 bg-[#F0F4F8]";
+          rootDiv.innerHTML = `
+            <div class="w-full max-w-md glass-panel p-8 rounded-3xl shadow-premium border border-white/60 relative z-10">
+              <div class="text-center mb-8">
+                <span class="text-5xl mb-3 block">🌊</span>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary-dark to-primary-accent bg-clip-text text-transparent">Create Account</h1>
+                <p class="text-sm text-slate-500 mt-2">Start your scheduling routine</p>
+              </div>
+
+              ${state.errorMessage ? `
+                <div class="mb-5 p-4 bg-red-50 border border-red-200 text-danger text-sm rounded-xl flex items-center gap-2">
+                  <span>⚠️</span> ${state.errorMessage}
+                </div>
+              ` : ''}
+
+              <form onsubmit="handleRegister(event)" class="space-y-5">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+                  <input type="text" id="reg-name" placeholder="John Doe" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm" required />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                  <input type="email" id="reg-email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm" required />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+                  <input type="password" id="reg-password" placeholder="••••••••" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm" required />
+                </div>
+                <button type="submit" class="w-full py-3 bg-[#1E3A5F] hover:bg-slate-800 text-white font-semibold rounded-xl shadow-premium transition duration-200 text-sm mt-2">
+                  Register
+                </button>
+              </form>
+              <div class="text-center mt-6 pt-6 border-t border-slate-200/50">
+                <p class="text-sm text-slate-500">
+                  Already have an account? 
+                  <button onclick="navigate('login')" class="text-primary-accent hover:underline font-semibold">Log In</button>
+                </p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // ==========================================
+        // MAIN WORKSPACE LAYOUT (WITH SIDEBAR)
+        // ==========================================
+        rootDiv.className = "flex flex-col lg:flex-row min-h-screen w-full";
+        
+        const navItemClass = (target) => 
+          `flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 ${
+            state.view === target 
+              ? 'bg-primary-accent text-white shadow-premium' 
+              : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A5F]'
+          }`;
+
+        const sidebarHTML = `
+          <aside class="w-full lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between lg:h-screen sticky top-0 z-30">
+            <div class="p-6">
+              <!-- Logo -->
+              <div class="flex items-center space-x-3 mb-8">
+                <span class="text-3xl">🌊</span>
+                <span class="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-primary-dark to-primary-accent bg-clip-text text-transparent">
+                  DayFlow
+                </span>
+              </div>
+
+              <!-- Navigation links -->
+              <nav class="space-y-1.5">
+                <button onclick="navigate('home')" class="w-full ${navItemClass('home')}">
+                  <i data-lucide="home" class="w-5 h-5"></i>
+                  <span class="font-medium text-sm">Home</span>
+                </button>
+                <button onclick="navigate('advice')" class="w-full ${navItemClass('advice')}">
+                  <i data-lucide="lightbulb" class="w-5 h-5"></i>
+                  <span class="font-medium text-sm">AI Advice</span>
+                </button>
+                <button onclick="navigate('analysis')" class="w-full ${navItemClass('analysis')}">
+                  <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                  <span class="font-medium text-sm">Analysis</span>
+                </button>
+                <button onclick="navigate('support')" class="w-full ${navItemClass('support')}">
+                  <i data-lucide="help-circle" class="w-5 h-5"></i>
+                  <span class="font-medium text-sm">Support</span>
+                </button>
+                ${state.user?.role === 'ADMIN' ? `
+                  <button onclick="navigate('adminSupport')" class="w-full ${navItemClass('adminSupport')}">
+                    <i data-lucide="shield" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Admin Panel</span>
+                  </button>
+                ` : ''}
+              </nav>
+            </div>
+
+            <!-- Profile & Logout -->
+            <div class="p-6 border-t border-slate-100 space-y-4">
+              <div class="flex items-center space-x-3">
+                <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-primary-dark">
+                  <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-slate-800 truncate">${state.user?.name || 'User'}</p>
+                  <p class="text-xs text-slate-500 truncate">${state.user?.email || 'user@example.com'}</p>
+                </div>
+              </div>
+              <button onclick="handleLogout()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-danger hover:bg-red-50 hover:text-red-700 transition duration-200 font-medium text-sm">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+                <span>Logout</span>
+              </button>
+            </div>
+          </aside>
+        `;
+
+        let viewContentHTML = '';
+
+        // View 1: Home Page
+        if (state.view === 'home') {
+          const today = new Date().toISOString().substring(0, 10);
+          const todayTasks = state.tasks.filter(t => t.taskDate === today);
+          const activeTasks = todayTasks.filter(t => !t.isCompleted);
+          const completedTasks = todayTasks.filter(t => t.isCompleted);
+          
+          const totalCount = todayTasks.length;
+          const completedCount = completedTasks.length;
+          const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+          viewContentHTML = `
+            <div class="flex-1 p-6 lg:p-10 max-w-5xl mx-auto space-y-8">
+              <!-- Header banner -->
+              <div class="glass-panel p-6 rounded-2xl shadow-premium border-l-4 border-l-primary-accent flex items-start space-x-4">
+                <span class="text-3xl">✨</span>
+                <div>
+                  <p class="italic text-slate-700 font-medium">"Your future is created by what you do today, not tomorrow."</p>
+                  <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Today's Motivation</p>
+                </div>
+              </div>
+
+              <!-- Stats & Progress -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-panel p-6 rounded-2xl shadow-premium md:col-span-2 flex flex-col justify-between">
+                  <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800">Today's Completion Rate</h3>
+                    <span class="text-xl font-extrabold text-primary-accent">${progress}%</span>
+                  </div>
+                  <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div class="bg-gradient-to-r from-primary-accent to-[#2ECC71] h-full rounded-full transition-all duration-500 ease-out" style="width: ${progress}%"></div>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-4">${completedCount} of ${totalCount} tasks completed.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-premium flex items-center justify-between">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Current Date</p>
+                    <p class="text-xl font-bold text-[#1E3A5F]">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                  </div>
+                  <div class="p-3 bg-blue-50 text-primary-accent rounded-xl">
+                    <i data-lucide="calendar" class="w-6 h-6"></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Task Workspace -->
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Task List -->
+                <div class="lg:col-span-2 space-y-6">
+                  <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                      <span>📅</span> <span>Today's Schedule</span>
+                    </h2>
+                    <button onclick="openAddTaskModal()" class="flex items-center space-x-2 bg-primary-accent hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition duration-200 shadow-premium">
+                      <i data-lucide="plus" class="w-4 h-4"></i> <span>Add Task</span>
+                    </button>
+                  </div>
+
+                  ${todayTasks.length === 0 ? `
+                    <div class="glass-panel p-12 rounded-2xl text-center space-y-3">
+                      <span class="text-4xl block">🌊</span>
+                      <h3 class="font-bold text-slate-800 text-lg">No tasks for today</h3>
+                      <p class="text-slate-500 text-sm max-w-sm mx-auto">Create a task to build your routine and keep your DayFlow clean.</p>
+                    </div>
+                  ` : `
+                    <div class="space-y-6">
+                      <!-- Active Tasks -->
+                      ${activeTasks.length > 0 ? `
+                        <div class="space-y-3">
+                          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Tasks (${activeTasks.length})</h4>
+                          ${activeTasks.map(task => `
+                            <div class="glass-panel p-5 rounded-2xl shadow-premium flex items-center justify-between border border-transparent hover:border-slate-200 transition duration-200">
+                              <div class="flex items-center space-x-4">
+                                <input type="checkbox" onchange="handleToggleComplete(${task.id})" class="w-5 h-5 rounded border-slate-300 text-primary-accent focus:ring-blue-100 cursor-pointer" />
+                                <div>
+                                  <p class="font-semibold text-slate-800 text-sm">${task.title}</p>
+                                  <div class="flex items-center space-x-3 mt-1 text-slate-400 text-xs font-medium">
+                                    <span class="flex items-center space-x-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> <span>${task.startTime}</span></span>
+                                    <span>•</span>
+                                    <span>${task.duration} min</span>
+                                    <span>•</span>
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold uppercase">${task.category}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="flex space-x-1">
+                                <button onclick="openEditTaskModal(${task.id})" class="p-2 text-slate-400 hover:text-primary-accent hover:bg-blue-50 rounded-lg transition"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                <button onclick="handleDeleteTask(${task.id})" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                              </div>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+
+                      <!-- Completed Tasks -->
+                      ${completedTasks.length > 0 ? `
+                        <div class="space-y-3 pt-4 border-t border-slate-200/50">
+                          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Tasks (${completedTasks.length})</h4>
+                          ${completedTasks.map(task => `
+                            <div class="glass-panel p-5 rounded-2xl shadow-premium flex items-center justify-between bg-slate-50/50 opacity-75">
+                              <div class="flex items-center space-x-4">
+                                <input type="checkbox" checked onchange="handleToggleComplete(${task.id})" class="w-5 h-5 rounded border-slate-300 text-success focus:ring-emerald-100 cursor-pointer" />
+                                <div>
+                                  <p class="font-medium text-slate-500 line-through text-sm">${task.title}</p>
+                                  <div class="flex items-center space-x-3 mt-1 text-slate-400 text-xs">
+                                    <span><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${task.startTime}</span>
+                                    <span>•</span>
+                                    <span>${task.duration} min</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <button onclick="handleDeleteTask(${task.id})" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `}
+                </div>
+
+                <!-- Habits and utilities -->
+                <div class="space-y-6">
+                  <div class="glass-panel p-6 rounded-2xl shadow-premium space-y-4">
+                    <h3 class="font-bold text-slate-800 flex items-center space-x-2">
+                      <i data-lucide="sparkles" class="text-warning w-5 h-5"></i> <span>Healthy Habits</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Integrate minor wellness activities into your daily routine.</p>
+                    
+                    <div class="space-y-3 pt-2">
+                      <button onclick="toggleHabit('hydrate')" class="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 transition text-left">
+                        <div class="flex items-center space-x-3">
+                          <span class="text-lg">💧</span>
+                          <span class="text-sm font-medium ${state.habits.hydrate ? 'line-through text-slate-400' : 'text-slate-700'}">Drink 500ml water</span>
+                        </div>
+                        <div class="w-5 h-5 rounded-full border flex items-center justify-center ${state.habits.hydrate ? 'bg-[#2ECC71] border-success text-white' : 'border-slate-300'}">
+                          ${state.habits.hydrate ? '✓' : ''}
+                        </div>
+                      </button>
+
+                      <button onclick="toggleHabit('stretch')" class="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 transition text-left">
+                        <div class="flex items-center space-x-3">
+                          <span class="text-lg">🧘</span>
+                          <span class="text-sm font-medium ${state.habits.stretch ? 'line-through text-slate-400' : 'text-slate-700'}">5-minute body stretch</span>
+                        </div>
+                        <div class="w-5 h-5 rounded-full border flex items-center justify-center ${state.habits.stretch ? 'bg-[#2ECC71] border-success text-white' : 'border-slate-300'}">
+                          ${state.habits.stretch ? '✓' : ''}
+                        </div>
+                      </button>
+
+                      <button onclick="toggleHabit('meditate')" class="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 transition text-left">
+                        <div class="flex items-center space-x-3">
+                          <span class="text-lg">🧘‍♂️</span>
+                          <span class="text-sm font-medium ${state.habits.meditate ? 'line-through text-slate-400' : 'text-slate-700'}">10-minute deep breathing</span>
+                        </div>
+                        <div class="w-5 h-5 rounded-full border flex items-center justify-center ${state.habits.meditate ? 'bg-[#2ECC71] border-success text-white' : 'border-slate-300'}">
+                          ${state.habits.meditate ? '✓' : ''}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // View 2: Advice Page
+        if (state.view === 'advice') {
+          viewContentHTML = `
+            <div class="flex-1 p-6 lg:p-10 max-w-5xl mx-auto space-y-8">
+              <div>
+                <h2 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                  <i data-lucide="sparkles" class="text-primary-accent w-6 h-6 animate-pulse-slow"></i>
+                  <span>AI Coaching Center</span>
+                </h2>
+                <p class="text-slate-500 text-sm mt-1">Provide your details to receive tailored routines & coaching advice from Claude AI.</p>
+              </div>
+
+              ${state.errorMessage ? `
+                <div class="p-4 bg-red-50 border border-red-200 text-danger text-sm rounded-xl">
+                  ⚠️ ${state.errorMessage}
+                </div>
+              ` : ''}
+
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-8">
+                  <div class="glass-panel p-6 rounded-2xl shadow-premium border border-slate-100">
+                    <h3 class="font-bold text-slate-800 text-base mb-4">Trait Input</h3>
+                    <form onsubmit="handleGetAdvice(event)" class="space-y-4">
+                      <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">What are your strengths? * (Min 10 characters)</label>
+                        <textarea id="adv-strengths" rows="3" placeholder="e.g. Organized planner, empathetic listener, quick learner, dedicated teammate..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm resize-none" required>${state.adviceInput.strengths}</textarea>
+                      </div>
+                      <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">What are your weaknesses? * (Min 10 characters)</label>
+                        <textarea id="adv-weaknesses" rows="3" placeholder="e.g. Easily distracted, procrastinator under pressure, struggle to say no..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm resize-none" required>${state.adviceInput.weaknesses}</textarea>
+                      </div>
+                      
+                      <button type="submit" class="w-full py-3 bg-[#1E3A5F] hover:bg-slate-800 text-white font-semibold rounded-xl shadow-premium transition duration-200 flex justify-center items-center space-x-2 text-sm">
+                        <span>Get AI Coaching Advice</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  ${state.isLoading ? `
+                    <div class="glass-panel p-12 rounded-2xl text-center space-y-3">
+                      <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-accent border-t-transparent mx-auto"></div>
+                      <p class="text-sm font-semibold text-slate-600">Claude AI is analyzing your habits...</p>
+                    </div>
+                  ` : ''}
+
+                  ${state.currentAdviceResult ? `
+                    <div class="glass-panel p-6 rounded-2xl shadow-premium border border-slate-100 space-y-6">
+                      <div class="flex items-center space-x-2 pb-4 border-b border-slate-100">
+                        <span class="text-2xl">💡</span>
+                        <div>
+                          <h3 class="font-bold text-slate-800">Your Tailored Growth Advice</h3>
+                          <p class="text-xs text-slate-400">Generated using Claude AI</p>
+                        </div>
+                      </div>
+                      <div class="space-y-6 text-sm text-slate-600 whitespace-pre-line leading-relaxed">
+                        ${state.currentAdviceResult.aiResponse}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <!-- History accordion panel -->
+                <div class="space-y-4">
+                  <div class="glass-panel p-6 rounded-2xl shadow-premium space-y-4">
+                    <h3 class="font-bold text-slate-800 flex items-center space-x-2">
+                      <i data-lucide="history" class="text-slate-400 w-5 h-5"></i> <span>History Logs</span>
+                    </h3>
+                    ${state.advice.length === 0 ? `
+                      <p class="text-xs text-slate-500 text-center py-6">Your past sessions will display here.</p>
+                    ` : `
+                      <div class="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                        ${state.advice.map(item => `
+                          <div class="border border-slate-100 rounded-xl overflow-hidden p-3 bg-slate-50/50">
+                            <p class="text-xs font-bold text-slate-700 truncate">Strengths: ${item.strengths}</p>
+                            <p class="text-[10px] text-slate-400 mt-1">${new Date(item.createdAt).toLocaleDateString()}</p>
+                            <button onclick='alert(\`${item.aiResponse.replace(/`/g, "\\`").replace(/'/g, "\\'")}\`)' class="mt-2 text-xs text-primary-accent font-semibold hover:underline">View Advice Output</button>
+                          </div>
+                        `).join('')}
+                      </div>
+                    `}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // View 3: Analysis Dashboard
+        if (state.view === 'analysis') {
+          const completedCount = state.tasks.filter(t => t.isCompleted).length;
+          const totalCount = state.tasks.length;
+          const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+          // Categorized duration
+          const catMap = {};
+          state.tasks.forEach(t => {
+            catMap[t.category] = (catMap[t.category] || 0) + t.duration;
+          });
+          const catLabels = Object.keys(catMap);
+          const catValues = Object.values(catMap);
+
+          viewContentHTML = `
+            <div class="flex-1 p-6 lg:p-10 max-w-5xl mx-auto space-y-8">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                    <i data-lucide="bar-chart-3" class="text-primary-accent w-6 h-6"></i>
+                    <span>Productivity Dashboard</span>
+                  </h2>
+                  <p class="text-slate-500 text-sm mt-1">Visualize scheduler metrics, task counts, and category distributions.</p>
+                </div>
+                
+                <button onclick="window.print()" class="flex items-center space-x-2 bg-primary-accent hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition duration-200 shadow-premium">
+                  <i data-lucide="download" class="w-4 h-4"></i> <span>Export Report</span>
+                </button>
+              </div>
+
+              <!-- Stat Cards -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-panel p-6 rounded-2xl shadow-premium flex items-center space-x-4">
+                  <div class="p-3 bg-blue-50 text-primary-accent rounded-xl"><i data-lucide="check-square" class="w-5 h-5"></i></div>
+                  <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Scheduled</p>
+                    <p class="text-2xl font-extrabold text-slate-800">${totalCount}</p>
+                  </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-premium flex items-center space-x-4">
+                  <div class="p-3 bg-emerald-50 text-success rounded-xl"><i data-lucide="list-checks" class="w-5 h-5"></i></div>
+                  <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Completed Tasks</p>
+                    <p class="text-2xl font-extrabold text-slate-800">${completedCount}</p>
+                  </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-premium flex items-center space-x-4">
+                  <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><i data-lucide="award" class="w-5 h-5"></i></div>
+                  <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Completion Rate</p>
+                    <p class="text-2xl font-extrabold text-slate-800">${completionRate}%</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Visual mock charts using SVG for 100% standalone reliability -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Bar Chart -->
+                <div class="glass-panel p-6 rounded-2xl shadow-premium space-y-4">
+                  <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider text-slate-400">Weekly Task Completion Rate</h3>
+                  <div class="h-64 flex items-end justify-between px-4 pb-2 border-b border-l border-slate-200 pt-6">
+                    <!-- Draw columns dynamically -->
+                    ${[
+                      { day: 'Mon', total: 4, done: 2 },
+                      { day: 'Tue', total: 3, done: 3 },
+                      { day: 'Wed', total: 5, done: 4 },
+                      { day: 'Thu', total: totalCount, done: completedCount }
+                    ].map(d => {
+                      const totalHeight = Math.min(100, Math.max(10, d.total * 15));
+                      const doneHeight = Math.min(100, Math.max(5, d.done * 15));
+                      return `
+                        <div class="flex flex-col items-center space-y-2 w-12">
+                          <div class="w-full flex justify-center items-end h-40 gap-1">
+                            <div class="bg-blue-200 w-3 rounded-t" style="height: ${totalHeight}%" title="Scheduled: ${d.total}"></div>
+                            <div class="bg-emerald-400 w-3 rounded-t" style="height: ${doneHeight}%" title="Completed: ${d.done}"></div>
+                          </div>
+                          <span class="text-xs font-semibold text-slate-500">${d.day}</span>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                  <div class="flex justify-center space-x-4 text-xs font-semibold">
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-blue-200 rounded"></span> Scheduled</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-emerald-400 rounded"></span> Completed</span>
+                  </div>
+                </div>
+
+                <!-- Pie Chart -->
+                <div class="glass-panel p-6 rounded-2xl shadow-premium space-y-4">
+                  <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider text-slate-400">Time Spent per Category (min)</h3>
+                  <div class="h-64 flex items-center justify-around">
+                    ${catLabels.length === 0 ? `
+                      <p class="text-xs text-slate-400">Add tasks with durations to render pie chart details.</p>
+                    ` : `
+                      <div class="relative w-40 h-40 rounded-full border-8 border-primary-accent flex items-center justify-center bg-blue-50/50">
+                        <div class="text-center">
+                          <span class="text-xs text-slate-400 font-bold block uppercase">Total Minutes</span>
+                          <span class="text-xl font-extrabold text-slate-800">${state.tasks.reduce((acc, t) => acc + t.duration, 0)}</span>
+                        </div>
+                      </div>
+                      <div class="space-y-2 text-xs font-semibold">
+                        ${catLabels.map((label, idx) => `
+                          <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${['#1E3A5F', '#2ECC71', '#3498DB', '#F39C12'][idx % 4]}"></span>
+                            <span class="text-slate-600">${label}: ${catMap[label]} min</span>
+                          </div>
+                        `).join('')}
+                      </div>
+                    `}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // View 4: Support Submission Form
+        if (state.view === 'support') {
+          viewContentHTML = `
+            <div class="flex-1 p-6 lg:p-10 max-w-2xl mx-auto space-y-8">
+              <div>
+                <h2 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                  <span>🆘</span> <span>Help & Support Center</span>
+                </h2>
+                <p class="text-slate-500 text-sm mt-1">Submit a support ticket and the admin team will resolve it.</p>
+              </div>
+
+              ${state.supportSuccess ? `
+                <div class="glass-panel p-8 rounded-2xl shadow-premium text-center space-y-4 border-emerald-100">
+                  <div class="h-14 w-14 bg-emerald-50 text-success rounded-full flex items-center justify-center mx-auto text-2xl">✓</div>
+                  <h3 class="text-lg font-bold text-slate-800">Message Submitted!</h3>
+                  <p class="text-slate-500 text-sm max-w-sm mx-auto">We will contact you via your submitted email address if required.</p>
+                  <button onclick="state.supportSuccess=false; render();" class="px-5 py-2.5 bg-primary-accent hover:bg-blue-600 text-white font-semibold rounded-xl text-sm transition">Send another</button>
+                </div>
+              ` : `
+                <div class="glass-panel p-6 lg:p-8 rounded-2xl shadow-premium border border-slate-100">
+                  <form onsubmit="handleSupportSubmit(event)" class="space-y-5">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Your Name</label>
+                      <input type="text" id="sup-name" value="${state.user?.name || ''}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                      <input type="email" id="sup-email" value="${state.user?.email || ''}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Subject</label>
+                      <input type="text" id="sup-subject" placeholder="e.g. App question" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Message</label>
+                      <textarea id="sup-message" rows="5" placeholder="Detail your request..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm resize-none" required></textarea>
+                    </div>
+                    <button type="submit" class="w-full py-3 bg-[#1E3A5F] hover:bg-slate-800 text-white font-semibold rounded-xl shadow-premium transition text-sm">Submit Ticket</button>
+                  </form>
+                </div>
+              `}
+            </div>
+          `;
+        }
+
+        // View 5: Admin Support Dashboard
+        if (state.view === 'adminSupport') {
+          viewContentHTML = `
+            <div class="flex-1 p-6 lg:p-10 max-w-5xl mx-auto space-y-8">
+              <div>
+                <h2 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                  <i data-lucide="shield" class="text-danger w-6 h-6"></i>
+                  <span>Admin Support Panel</span>
+                </h2>
+                <p class="text-slate-500 text-sm mt-1">Resolve incoming user support queries and feedback tickets.</p>
+              </div>
+
+              <div class="glass-panel rounded-2xl shadow-premium border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr class="bg-slate-50/50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <th class="p-4 pl-6">Status</th>
+                        <th class="p-4">Sender</th>
+                        <th class="p-4">Subject</th>
+                        <th class="p-4">Message</th>
+                        <th class="p-4 pr-6">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      ${state.support.map(msg => `
+                        <tr class="hover:bg-slate-50/20 transition">
+                          <td class="p-4 pl-6">
+                            <button onclick="toggleResolveMessage(${msg.id})" class="flex items-center space-x-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                              msg.isResolved 
+                                ? 'bg-emerald-50 text-success border-emerald-100' 
+                                : 'bg-amber-50 text-warning border-amber-100'
+                            }">
+                              <span>${msg.isResolved ? 'Resolved' : 'Pending'}</span>
+                            </button>
+                          </td>
+                          <td class="p-4">
+                            <p class="font-bold text-slate-800 text-xs">${msg.name}</p>
+                            <p class="text-slate-400 text-[10px]">${msg.email}</p>
+                          </td>
+                          <td class="p-4 font-semibold text-slate-800 text-xs">${msg.subject}</td>
+                          <td class="p-4 text-slate-600 text-xs max-w-xs truncate">${msg.message}</td>
+                          <td class="p-4 pr-6 text-slate-400 text-[10px] whitespace-nowrap">${new Date(msg.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        rootDiv.innerHTML = sidebarHTML + `<main class="flex-1 overflow-y-auto">${viewContentHTML}</main>`;
+
+        // Mount Task Modal Form
+        if (state.isModalOpen) {
+          const modalHTML = `
+            <div class="fixed inset-0 bg-[#1E3A5F]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div class="bg-white rounded-2xl w-full max-w-md shadow-premium border border-slate-100 overflow-hidden">
+                <div class="flex items-center justify-between p-6 border-b border-slate-100">
+                  <h3 class="text-lg font-bold text-slate-800">${state.editingTask ? 'Edit Task' : 'Add New Task'}</h3>
+                  <button onclick="closeTaskModal()" class="p-1 rounded-lg text-slate-400 hover:bg-slate-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                <form onsubmit="handleSaveTask(event)" class="p-6 space-y-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Task Title *</label>
+                    <input type="text" id="task-title" value="${state.editingTask ? state.editingTask.title : ''}" placeholder="e.g. Design meeting" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Category</label>
+                    <select id="task-category" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm bg-white">
+                      <option value="Work" ${state.editingTask?.category === 'Work' ? 'selected' : ''}>Work</option>
+                      <option value="Personal" ${state.editingTask?.category === 'Personal' ? 'selected' : ''}>Personal</option>
+                      <option value="Health" ${state.editingTask?.category === 'Health' ? 'selected' : ''}>Health</option>
+                      <option value="Study" ${state.editingTask?.category === 'Study' ? 'selected' : ''}>Study</option>
+                      <option value="Other" ${state.editingTask?.category === 'Other' ? 'selected' : ''}>Other</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Start Time *</label>
+                      <input type="time" id="task-time" value="${state.editingTask ? state.editingTask.startTime : '09:00'}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Duration (min) *</label>
+                      <input type="number" id="task-duration" value="${state.editingTask ? state.editingTask.duration : '30'}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Date</label>
+                    <input type="date" id="task-date" value="${state.editingTask ? state.editingTask.taskDate : new Date().toISOString().substring(0, 10)}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary-accent text-sm" required />
+                  </div>
+                  <div class="flex space-x-3 pt-4 border-t border-slate-100 mt-6">
+                    <button type="button" onclick="closeTaskModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 py-3 bg-primary-accent hover:bg-blue-600 text-white font-semibold rounded-xl text-sm shadow-premium">Save Task</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          `;
+          rootDiv.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        // Trigger Lucide icons rendering
+        lucide.createIcons();
+      };
+
+      // Task Modal Helpers
+      const openAddTaskModal = () => {
+        state.editingTask = null;
+        state.isModalOpen = true;
+        render();
+      };
+      const openEditTaskModal = (taskId) => {
+        state.editingTask = state.tasks.find(t => t.id === taskId);
+        state.isModalOpen = true;
+        render();
+      };
+      const closeTaskModal = () => {
+        state.isModalOpen = false;
+        state.editingTask = null;
+        render();
+      };
+
+      // Initialize App
+      render();
+    </script>
+  </body>
+</html>

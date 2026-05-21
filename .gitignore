@@ -1,0 +1,29 @@
+# Maven
+target/
+*.pom.properties
+*.system
+*.lnk
+
+# Node / Frontend
+node_modules/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+bin/
+
+# OS files
+Thumbs.db
+EHthumbs.db
+Desktop.ini
+.DS_Store
