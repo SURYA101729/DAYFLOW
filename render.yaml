@@ -12,10 +12,18 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     envVars:
-      - key: DATABASE_URL
+      - key: DB_HOST
         fromDatabase:
           name: dayflow-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: dayflow-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: dayflow-db
+          property: database
       - key: DB_USERNAME
         fromDatabase:
           name: dayflow-db
