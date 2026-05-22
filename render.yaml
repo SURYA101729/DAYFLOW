@@ -11,6 +11,7 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
+    healthCheckPath: /api/auth/health
     envVars:
       - key: DB_HOST
         fromDatabase:
