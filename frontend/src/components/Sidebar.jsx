@@ -29,6 +29,7 @@ const Sidebar = () => {
     { name: 'Advice', path: '/advice', icon: Lightbulb },
     { name: 'Analysis', path: '/analysis', icon: BarChart3 },
     { name: 'Support', path: '/support', icon: HelpCircle },
+    { name: 'Theme', path: '/theme', icon: Palette },
   ];
 
   if (user?.role === 'ADMIN') {
@@ -149,18 +150,6 @@ const Sidebar = () => {
 
         {/* Bottom section */}
         <div className="p-6 space-y-3" style={{ borderTop: '1px solid var(--border-color)' }}>
-
-          {/* Theme button */}
-          <button
-            onClick={() => { setShowTheme(true); setIsOpen(false); }}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 text-sm font-medium"
-            style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-color)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <Palette size={20} />
-            <span>Customize Theme</span>
-          </button>
 
           {/* User profile */}
           {user && (

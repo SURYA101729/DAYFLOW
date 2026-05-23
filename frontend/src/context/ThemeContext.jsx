@@ -90,6 +90,10 @@ export const ThemeProvider = ({ children }) => {
     return localStorage.getItem('dayflow_photo') || null;
   });
 
+  const [bgPhoto, setBgPhoto] = useState(() => {
+    return localStorage.getItem('dayflow_bg_photo') || null;
+  });
+
   const colorTheme = COLOR_THEMES.find(t => t.id === colorThemeId) || COLOR_THEMES[0];
 
   // Apply CSS variables to :root whenever theme changes
@@ -99,6 +103,14 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--color-accent', colorTheme.accent);
     root.style.setProperty('--color-primary-dark', colorTheme.dark);
     root.style.setProperty('--color-primary-light', colorTheme.light);
+
+    if (bgPhoto) {
+      root.style.setProperty('--bg-photo-url', `url(${bgPhoto})`);
+      root.classList.add('has-bg-photo');
+    } else {
+      root.style.setProperty('--bg-photo-url', 'none');
+      root.classList.remove('has-bg-photo');
+    }
 
     if (isDark) {
       root.classList.add('dark');
@@ -120,7 +132,7 @@ export const ThemeProvider = ({ children }) => {
 
     localStorage.setItem('dayflow_dark', isDark);
     localStorage.setItem('dayflow_theme', colorThemeId);
-  }, [isDark, colorThemeId, colorTheme]);
+  }, [isDark, colorThemeId, colorTheme, bgPhoto]);
 
   const toggleDark = () => setIsDark(prev => !prev);
 
@@ -138,6 +150,15 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
+  const updateBgPhoto = (dataUrl) => {
+    setBgPhoto(dataUrl);
+    if (dataUrl) {
+      localStorage.setItem('dayflow_bg_photo', dataUrl);
+    } else {
+      localStorage.removeItem('dayflow_bg_photo');
+    }
+  };
+
   return (
     <ThemeContext.Provider value={{
       isDark,
@@ -147,6 +168,8 @@ export const ThemeProvider = ({ children }) => {
       setTheme,
       profilePhoto,
       updateProfilePhoto,
+      bgPhoto,
+      updateBgPhoto,
       themes: COLOR_THEMES,
     }}>
       {children}

@@ -80,3 +80,27 @@ button, a, input, textarea, select {
               color 0.2s ease, opacity 0.2s ease, transform 0.15s ease,
               box-shadow 0.2s ease;
 }
+
+/* ── Custom Background Photo ── */
+.has-bg-photo body {
+  background-image: linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.75)), var(--bg-photo-url) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+}
+
+.has-bg-photo:not(.dark) body {
+  background-image: linear-gradient(rgba(240, 244, 248, 0.85), rgba(240, 244, 248, 0.85)), var(--bg-photo-url) !important;
+}
+
+.has-bg-photo .glass-panel {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+.has-bg-photo.dark .glass-panel {
+  background: rgba(30, 41, 59, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}

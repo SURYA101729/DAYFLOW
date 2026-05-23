@@ -9,6 +9,7 @@ import Advice from './pages/Advice';
 import Analysis from './pages/Analysis';
 import Support from './pages/Support';
 import AdminSupport from './pages/AdminSupport';
+import Theme from './pages/Theme';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -35,6 +36,7 @@ const AppContent = () => {
       <Route path="/advice" element={<ProtectedRoute><DashboardLayout><Advice /></DashboardLayout></ProtectedRoute>} />
       <Route path="/analysis" element={<ProtectedRoute><DashboardLayout><Analysis /></DashboardLayout></ProtectedRoute>} />
       <Route path="/support" element={<ProtectedRoute><DashboardLayout><Support /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/theme" element={<ProtectedRoute><DashboardLayout><Theme /></DashboardLayout></ProtectedRoute>} />
       <Route path="/admin/support" element={<ProtectedRoute requiredRole="ADMIN"><DashboardLayout><AdminSupport /></DashboardLayout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
