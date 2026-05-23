@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
@@ -13,7 +14,7 @@ import Register from './pages/Register';
 
 const DashboardLayout = ({ children }) => {
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen" style={{ background: 'var(--bg-main)' }}>
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         {children}
@@ -26,68 +27,15 @@ const AppContent = () => {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Pages where we hide the sidebar layout
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
-
   return (
     <Routes>
-      {/* Public Pages */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
-
-      {/* Protected Pages under Dashboard layout */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Home />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/advice"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Advice />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/analysis"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Analysis />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/support"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Support />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/support"
-        element={
-          <ProtectedRoute requiredRole="ADMIN">
-            <DashboardLayout>
-              <AdminSupport />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Fallback */}
+      <Route path="/" element={<ProtectedRoute><DashboardLayout><Home /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/advice" element={<ProtectedRoute><DashboardLayout><Advice /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/analysis" element={<ProtectedRoute><DashboardLayout><Analysis /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/support" element={<ProtectedRoute><DashboardLayout><Support /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/admin/support" element={<ProtectedRoute requiredRole="ADMIN"><DashboardLayout><AdminSupport /></DashboardLayout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -95,9 +43,11 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

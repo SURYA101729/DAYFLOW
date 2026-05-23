@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import ThemePanel from './ThemePanel';
 import {
   Home,
   Lightbulb,
@@ -10,13 +12,17 @@ import {
   Shield,
   Menu,
   X,
-  User as UserIcon
+  Palette,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
+  const { isDark, toggleDark, colorTheme, profilePhoto } = useTheme();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
@@ -35,89 +41,172 @@ const Sidebar = () => {
   };
 
   const linkClass = ({ isActive }) =>
-    `flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 ${
-      isActive
-        ? 'bg-primary-accent text-white shadow-premium'
-        : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A5F]'
+    `flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 font-medium text-sm ${
+      isActive ? 'text-white shadow-md' : ''
     }`;
+
+  const linkStyle = (isActive) => isActive
+    ? { background: 'var(--color-accent)' }
+    : { color: 'var(--text-secondary)' };
 
   return (
     <>
-      {/* Mobile top navigation */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-40">
+      {/* Mobile top bar */}
+      <div
+        className="lg:hidden flex items-center justify-between p-4 sticky top-0 z-40"
+        style={{ background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border-color)' }}
+      >
         <div className="flex items-center space-x-2">
           <span className="text-2xl">🌊</span>
-          <span className="font-bold text-xl tracking-tight text-[#1E3A5F]">DayFlow</span>
+          <span className="font-bold text-xl tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            DayFlow
+          </span>
         </div>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition"
-        >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Dark mode toggle - mobile */}
+          <button
+            onClick={toggleDark}
+            className="p-2 rounded-lg transition hover:opacity-70"
+            style={{ color: 'var(--text-secondary)' }}
+            title={isDark ? 'Light mode' : 'Dark mode'}
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 rounded-lg transition hover:opacity-70"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {isOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
 
-      {/* Sidebar background drawer on mobile */}
+      {/* Mobile backdrop */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-[#1E3A5F]/20 backdrop-blur-sm z-40 transition-opacity"
+          className="lg:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Main Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 bottom-0 z-45 w-64 bg-white border-r border-slate-200 flex flex-col justify-between h-screen transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed lg:sticky top-0 left-0 bottom-0 z-45 w-64 flex flex-col justify-between h-screen transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
+        style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-color)' }}
       >
         <div className="p-6">
           {/* Logo */}
-          <div className="hidden lg:flex items-center space-x-3 mb-8">
-            <span className="text-3xl">🌊</span>
-            <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-primary-dark to-primary-accent bg-clip-text text-transparent">
-              DayFlow
-            </span>
+          <div className="hidden lg:flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-3">
+              <span className="text-3xl">🌊</span>
+              <span
+                className="font-extrabold text-2xl tracking-tight"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                DayFlow
+              </span>
+            </div>
+            {/* Dark mode toggle - desktop */}
+            <button
+              onClick={toggleDark}
+              className="p-2 rounded-lg transition hover:opacity-70"
+              style={{ color: 'var(--text-secondary)' }}
+              title={isDark ? 'Light mode' : 'Dark mode'}
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
           </div>
 
-          {/* Nav List */}
+          {/* Nav */}
           <nav className="space-y-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.path}
+                end={item.path === '/'}
                 onClick={() => setIsOpen(false)}
                 className={linkClass}
+                style={({ isActive }) => linkStyle(isActive)}
               >
-                <item.icon size={20} />
-                <span className="font-medium text-sm">{item.name}</span>
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      size={20}
+                      style={{ color: isActive ? '#fff' : 'var(--text-secondary)' }}
+                    />
+                    <span style={{ color: isActive ? '#fff' : 'var(--text-secondary)' }}>
+                      {item.name}
+                    </span>
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
         </div>
 
-        {/* User profile & Logout */}
-        <div className="p-6 border-t border-slate-100 space-y-4">
+        {/* Bottom section */}
+        <div className="p-6 space-y-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+
+          {/* Theme button */}
+          <button
+            onClick={() => { setShowTheme(true); setIsOpen(false); }}
+            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 text-sm font-medium"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-color)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Palette size={20} />
+            <span>Customize Theme</span>
+          </button>
+
+          {/* User profile */}
           {user && (
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-primary-dark">
-                <UserIcon size={18} />
+            <div className="flex items-center space-x-3 px-1">
+              <div
+                className="h-10 w-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 shadow-sm"
+                style={{
+                  background: profilePhoto ? 'transparent' : `linear-gradient(135deg, ${colorTheme.dark}, ${colorTheme.accent})`,
+                  border: `2px solid var(--color-accent)`,
+                }}
+              >
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-bold">
+                    {user.name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
-                <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {user.name}
+                </p>
+                <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                  {user.email}
+                </p>
               </div>
             </div>
           )}
+
+          {/* Logout */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-danger hover:bg-red-50 hover:text-red-700 transition duration-200 font-medium text-sm"
+            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition duration-200 font-medium text-sm"
+            style={{ color: '#E74C3C' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <LogOut size={20} />
             <span>Logout</span>
           </button>
         </div>
       </aside>
+
+      {/* Theme Panel */}
+      {showTheme && <ThemePanel onClose={() => setShowTheme(false)} />}
     </>
   );
 };
