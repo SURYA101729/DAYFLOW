@@ -45,9 +45,18 @@ export const ThemeProvider = ({ children }) => {
       root.style.setProperty('--border-color',  '#E2E8F0');
     }
 
+    // Apply background photo to DOM
+    if (bgPhoto) {
+      root.style.setProperty('--bg-photo-url', `url("${bgPhoto}")`);
+      root.classList.add('has-bg-photo');
+    } else {
+      root.style.removeProperty('--bg-photo-url');
+      root.classList.remove('has-bg-photo');
+    }
+
     localStorage.setItem('dayflow_dark', isDark);
     localStorage.setItem('dayflow_theme', colorThemeId);
-  }, [isDark, colorThemeId, colorTheme]);
+  }, [isDark, colorThemeId, colorTheme, bgPhoto]);
 
   const toggleDark = () => setIsDark(p => !p);
   const setTheme = (id) => { setColorThemeId(id); localStorage.setItem('dayflow_theme', id); };

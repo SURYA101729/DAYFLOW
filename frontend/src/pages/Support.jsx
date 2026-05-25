@@ -14,171 +14,89 @@ const Support = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  const validateEmail = (emailStr) => {
-    return /\S+@\S+\.\S+/.test(emailStr);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess(false);
-
-    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
-      setError('All fields are required.');
-      return;
-    }
-
-    if (!validateEmail(email.trim())) {
-      setError('Please provide a valid email address.');
-      return;
-    }
-
+    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) { setError('All fields are required.'); return; }
+    if (!/\S+@\S+\.\S+/.test(email.trim())) { setError('Please provide a valid email address.'); return; }
     try {
       setIsSubmitting(true);
-      await api.post('/api/support', {
-        name: name.trim(),
-        email: email.trim(),
-        subject: subject.trim(),
-        message: message.trim(),
-      });
-      setSuccess(true);
-      setSubject('');
-      setMessage('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to submit message. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+      await api.post('/api/support', { name: name.trim(), email: email.trim(), subject: subject.trim(), message: message.trim() });
+      setSuccess(true); setSubject(''); setMessage('');
+    } catch (err) { console.error(err); setError('Failed to submit message. Please try again.'); }
+    finally { setIsSubmitting(false); }
   };
+
+  const inputStyle = { background: 'var(--bg-main)', color: 'var(--text-primary)', borderColor: 'var(--border-color)' };
 
   return (
     <div className="flex-1 p-6 lg:p-10 max-w-2xl mx-auto space-y-8">
-      {/* Intro */}
       <div>
-        <h2 className="text-xl font-bold text-slate-800 flex items-center space-x-2">
-          <span>🆘</span>
-          <span>Help & Support Center</span>
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <span>🆘</span><span>Help & Support Center</span>
         </h2>
-        <p className="text-slate-500 text-sm mt-1">
-          Have questions or encountered an issue? Submit a ticket, and our team will get back to you shortly.
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          Have questions or encountered an issue? Submit a ticket and our team will get back to you.
         </p>
       </div>
 
       {success ? (
-        <div className="glass-panel p-8 rounded-2xl shadow-premium text-center border-emerald-100 space-y-4 animate-pulse-slow-once">
-          <div className="h-16 w-16 bg-emerald-50 text-success rounded-full flex items-center justify-center mx-auto">
+        <div className="glass-panel p-8 rounded-2xl shadow-premium text-center space-y-4">
+          <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto"
+            style={{ background: '#10B98120', color: '#10B981' }}>
             <CheckCircle2 size={36} />
           </div>
-          <h3 className="text-xl font-bold text-slate-800">Support Ticket Created!</h3>
-          <p className="text-slate-500 text-sm max-w-sm mx-auto">
-            We have received your message. A representative will contact you at <strong>{email}</strong> if required.
+          <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Support Ticket Created!</h3>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            We received your message. A representative will contact you at <strong>{email}</strong>.
           </p>
-          <button
-            onClick={() => setSuccess(false)}
-            className="mt-4 px-6 py-2.5 bg-primary-accent hover:bg-blue-600 text-white font-semibold rounded-xl text-sm transition duration-200 shadow-premium"
-          >
+          <button onClick={() => setSuccess(false)}
+            className="mt-2 px-6 py-2.5 text-white font-semibold rounded-xl text-sm transition hover:opacity-90"
+            style={{ background: 'var(--color-accent)' }}>
             Send Another Message
           </button>
         </div>
       ) : (
-        <div className="glass-panel p-6 lg:p-8 rounded-2xl shadow-premium border border-slate-100">
-          <h3 className="font-bold text-slate-800 text-base mb-6">Contact Us</h3>
+        <div className="glass-panel p-6 lg:p-8 rounded-2xl shadow-premium" style={{ border: '1px solid var(--border-color)' }}>
+          <h3 className="font-bold text-base mb-6" style={{ color: 'var(--text-primary)' }}>Contact Us</h3>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-danger rounded-xl flex items-start space-x-2 text-sm">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-start gap-2 text-sm">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" /><span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name */}
+            {[
+              { label: 'Your Name *', value: name, set: setName, icon: User, type: 'text', placeholder: 'John Doe' },
+              { label: 'Email Address *', value: email, set: setEmail, icon: Mail, type: 'email', placeholder: 'you@example.com' },
+              { label: 'Subject *', value: subject, set: setSubject, icon: HelpCircle, type: 'text', placeholder: 'e.g. Question about AI Advice limit' },
+            ].map(({ label, value, set, icon: Icon, type, placeholder }) => (
+              <div key={label}>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-secondary)' }}>{label}</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center" style={{ color: 'var(--text-secondary)' }}><Icon size={17} /></span>
+                  <input type={type} value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition"
+                    style={inputStyle} required />
+                </div>
+              </div>
+            ))}
+
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Your Name *
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-secondary)' }}>Message *</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <User size={18} />
-                </span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm"
-                  required
-                />
+                <span className="absolute top-3 left-3" style={{ color: 'var(--text-secondary)' }}><FileText size={17} /></span>
+                <textarea value={message} onChange={e => setMessage(e.target.value)}
+                  placeholder="Describe your question or issue in detail..." rows={5}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition resize-none"
+                  style={inputStyle} required />
               </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Email Address *
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <Mail size={18} />
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Subject */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Subject *
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <HelpCircle size={18} />
-                </span>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Question about AI Advice limit"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Message */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Message Description *
-              </label>
-              <div className="relative">
-                <span className="absolute top-3 left-3 text-slate-400">
-                  <FileText size={18} />
-                </span>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Describe your question or issue in detail..."
-                  rows={5}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-accent focus:outline-none focus:ring-4 focus:ring-blue-100 transition duration-200 text-sm resize-none"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-primary-accent hover:bg-blue-600 disabled:bg-blue-400 text-white font-semibold rounded-xl shadow-premium transition duration-200 flex justify-center items-center text-sm"
-            >
+            <button type="submit" disabled={isSubmitting}
+              className="w-full py-3 text-white font-semibold rounded-xl transition flex justify-center items-center text-sm"
+              style={{ background: isSubmitting ? 'var(--text-secondary)' : 'var(--color-accent)' }}>
               {isSubmitting ? <LoadingSpinner size="sm" color="white" /> : 'Submit Support Message'}
             </button>
           </form>

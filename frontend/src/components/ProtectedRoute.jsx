@@ -9,19 +9,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#F0F4F8]">
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: 'var(--bg-main)' }}>
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/" replace />;
-  }
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (requiredRole && user.role !== requiredRole) return <Navigate to="/" replace />;
 
   return children;
 };
